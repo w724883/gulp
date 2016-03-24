@@ -1,50 +1,132 @@
-var gulp = require('gulp');
-var uglify = require('gulp-uglify');
-var jshint = require('gulp-jshint');
-var rename = require('gulp-rename');
-var concat = require('gulp-concat');
-gulp.task('js', function () {	//gulp.task('build', ['css', 'js', 'imgs']); 指定任务
-	/*
-	*	gulp.task('css', ['greet'], function () {});	指定任务依赖，css在greet完成后执行
-	*/
-  	return gulp.src('base.js')	//['a.js','b.js']多个文件
-    .pipe(jshint())
-    .pipe(uglify())
-    .pipe(rename('min.js'))
-    // .pipe(concat('select2.js'))
-    .pipe(gulp.dest('build'));	//可配置第二个参数{cwd: './app',mode: '0644'}
+var gulp = require('gulp'),
+	// runSequence = require('run-sequence'),
+	concat = require('gulp-concat'),
+	sass = require('gulp-ruby-sass'),
+	files = require('gulp-group-files'),
+	rev = require('gulp-rev'),
+	collector = require('gulp-rev-collector'),
+	uglify = require('gulp-uglify'),
+	// rename = require('gulp-rename'),
+	// browserify = require('browserify'),
+	// babelify = require('babelify'),
+	// source = require('vinyl-source-stream'),
+	includer = require('gulp-content-includer'),
+	// jsx = require('gulp-jsx'),
+	react = require('gulp-react');
+	// browserSync = require('browser-sync'),
+	// spritesmith = require('grunt-spritesmith'),
+	// reactify = require ( 'reactify' );
 
-});
+
+// concat html
+function concatCb(){
+	var options = {
+		competitionLeaflet:{
+			src:['rev-manifest.json','html/header.html','html/modules/competitionLeaflet.html','html/footer.html'],
+			dest:'competitionLeaflet.html'
+		},
+		competition:{
+			src:['rev-manifest.json','html/header.html','html/modules/competition.html','html/footer.html'],
+			dest:'competition.html'
+		}
+	}
+	for(var key in options){
+		gulp.src(options[key].src)
+			.pipe(includer({
+	    		includerReg:/<!\-\-include\s+"([^"]+)"\-\->/g
+	        }))
+			.pipe(collector())
+			.pipe(concat(options[key].dest))
+			.pipe(gulp.dest('../'));
+	}
+}
+
+// sass
+function sassCb(){
+	return files({
+		common:{
+			src:'sass/common.scss',
+			dest:'../css'
+		},
+		competition:{
+			src:'sass/competition.scss',
+			dest:'../css'
+		},
+		index:{
+			src:'sass/index.scss',
+			dest:'../css'
+		}
+	},function(key,value){
+		return sass(value.src,{
+			sourcemap:true,
+			// sourcemapPath:'./sass',
+			style:'compressed',
+			// compass:true
+		}).on('error', function (err) {
+                console.error('compile sass file error: %s', err.message);
+        })
+        .pipe(rev())
+        .pipe(gulp.dest(value.dest))
+        .pipe(rev.manifest({
+        	base: './',
+        	merge: true
+        }))
+        .pipe(gulp.dest('./'));
+	})();
+}
+
+// js
+function uglifyCb(){
+	gulp.src('js/**/*.js')
+    // .pipe(uglify())
+    .pipe(rev())
+    .pipe(gulp.dest('../js'))
+    .pipe(rev.manifest({
+       	base: './',
+    	merge: true
+    }))
+    .pipe(gulp.dest('./'));
+}
+
+// 编译jsx
+function jsxCb(){
+	gulp.src('jsx/**')
+	.pipe(react())
+	.pipe(gulp.dest('js/'));
+	// return browserify('jsx/modules/competition.js')
+ //         .transform(babelify)
+ //         .bundle()
+ //         .pipe(source('competition.js'))
+ //         .pipe(gulp.dest('js/modules'));
+}
+
+// MD5版本号
+// gulp.task('revHtml',function(){
+// 	gulp.src(['rev/**/*.json', 'src/css/*.sass'])
+//     	.pipe(collector())
+//     	.pipe(gulp.dest());
+// });
+
+// gulp.task('watch',['concat'],function(){
+// 	setTimeout(function(){
+// 		gulp.watch('sass/*',['sass']);
+// 		gulp.watch('html/**',['concat']);
+// 		gulp.watch('jsx/**',['jsx']);
+// 		gulp.watch('js/**',['uglify']);
+// 	},1000);
+	
+// });
+gulp.task('concat',['sass','uglify'],concatCb);
+gulp.task('sass',sassCb);
+gulp.task('uglify',['jsx'],uglifyCb);
+gulp.task('jsx',jsxCb);
+
+gulp.watch('sass/*',sassCb);
+gulp.watch('html/**',concatCb);
+gulp.watch('jsx/**',jsxCb);
+gulp.watch('js/**',uglifyCb);
+
+gulp.task('dev',['concat']);
 
 
-/*
-*	gulp.watch('templates/*.tmpl.html', function (event) {});	回调函数代替任务执行
-*	
-*
-	var watcher = gulp.watch('base.js', ['js']);
-	watcher.on('change', function (event) {});	
-	//end：回调函数运行完毕时触发。
-	//error：发生错误时触发。
-	//ready：当开始监听文件时触发。
-	//nomatch：没有匹配的监听文件时触发。
-	//watcher.end()：停止watcher对象，不会再调用任务或回调函数。
-	//watcher.files()：返回watcher对象监视的文件。
-	//watcher.add(glob)：增加所要监视的文件，它还可以附件第二个参数，表示回调函数。
-	//watcher.remove(filepath)：从watcher对象中移走一个监视的文件。
-*/
-gulp.task('watch', function () {
-   gulp.watch('base.js', ['js']);
-});
 
-/*
-	var gulp = require('gulp'),
-    plugins = require('gulp-load-plugins')();
-    gulp.task('js', function () {
-       return gulp.src('js/*.js')
-          .pipe(plugins.jshint())
-          .pipe(plugins.jshint.reporter('default'))
-          .pipe(plugins.uglify())
-          .pipe(plugins.concat('app.js'))
-          .pipe(gulp.dest('build'));
-    });
-*/
